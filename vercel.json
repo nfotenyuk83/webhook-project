@@ -14,6 +14,10 @@
     {
       "src": "/data",
       "dest": "/api/data.js"
+    },
+    {
+      "src": "/clear",
+      "dest": "/api/clear.js"
     }
   ]
 }
