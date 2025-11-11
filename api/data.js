@@ -1,21 +1,15 @@
 // api/data.js
-const fs = require('fs');
+const { Redis } = require('@upstash/redis');
+
+const redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
 module.exports = async (req, res) => {
     try {
-        const dataPath = '/tmp/webhook-data.json';
-
-        // Check if file exists
-        if (!fs.existsSync(dataPath)) {
-            return res.status(200).json({
-                data: [],
-                message: 'No data received yet'
-            });
-        }
-
-        // Read and return the data
-        const fileContent = fs.readFileSync(dataPath, 'utf8');
-        const data = JSON.parse(fileContent);
+        // Read data from Upstash Redis
+        const data = await redis.get('webhook-data') || [];
 
         res.status(200).json({
             data: data,
@@ -26,7 +20,8 @@ module.exports = async (req, res) => {
     } catch (error) {
         console.error('Error reading data:', error);
         res.status(500).json({
-            error: 'Error reading data'
+            error: 'Error reading data',
+            details: error.message
         });
     }
 };

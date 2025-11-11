@@ -1,6 +1,10 @@
 // api/webhook.js
-const fs = require('fs');
-const path = require('path');
+const { Redis } = require('@upstash/redis');
+
+const redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
 module.exports = async (req, res) => {
     // Only allow POST requests
@@ -18,26 +22,19 @@ module.exports = async (req, res) => {
             receivedAt: new Date().toISOString()
         };
 
-        // Path to store data (in /tmp for Vercel)
-        const dataPath = '/tmp/webhook-data.json';
-
-        // Read existing data or create empty array
-        let allData = [];
-        if (fs.existsSync(dataPath)) {
-            const fileContent = fs.readFileSync(dataPath, 'utf8');
-            allData = JSON.parse(fileContent);
-        }
+        // Read existing data from Upstash Redis
+        let allData = await redis.get('webhook-data') || [];
 
         // Add new data
         allData.push(dataWithTimestamp);
 
-        // Keep only last 100 entries to avoid file getting too large
+        // Keep only last 100 entries to avoid storage getting too large
         if (allData.length > 100) {
             allData = allData.slice(-100);
         }
 
-        // Save back to file
-        fs.writeFileSync(dataPath, JSON.stringify(allData, null, 2));
+        // Save back to Upstash Redis
+        await redis.set('webhook-data', allData);
 
         // Send success response
         res.status(200).json({
@@ -50,7 +47,8 @@ module.exports = async (req, res) => {
         console.error('Error processing webhook:', error);
         res.status(500).json({
             success: false,
-            error: 'Internal server error'
+            error: 'Internal server error',
+            details: error.message
         });
     }
 };
